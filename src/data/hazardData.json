@@ -1,0 +1,100 @@
+{
+  "district": "Wayanad",
+  "red_zones": [
+    {
+      "id": "z1",
+      "name": "Mundakkai-Chooralmala Slope",
+      "hazard_type": "Landslide",
+      "cause": "Steep slope and saturated soil",
+      "polygon": [[11.505, 76.125], [11.505, 76.150], [11.535, 76.150], [11.535, 76.125]]
+    },
+    {
+      "id": "z2",
+      "name": "Puthumala Hillside",
+      "hazard_type": "Landslide",
+      "cause": "Loose soil and past slide history",
+      "polygon": [[11.490, 76.140], [11.490, 76.160], [11.510, 76.160], [11.510, 76.140]]
+    },
+    {
+      "id": "z3",
+      "name": "Punnapuzha Riverbank",
+      "hazard_type": "Flood",
+      "cause": "River overflow in heavy rain",
+      "polygon": [[11.523, 76.134], [11.523, 76.144], [11.532, 76.144], [11.532, 76.134]]
+    }
+  ],
+  "habitations": [
+    {
+      "id": "h1",
+      "name": "Mundakkai",
+      "lat": 11.5173,
+      "lng": 76.1360,
+      "population": 850,
+      "hazard_type": "Landslide",
+      "hazard_note": "Inside Slope zone Z1",
+      "priority": { "tier": "Red", "priority_score": 85 },
+      "recommended_sites": [{ "site_name": "Meppadi Relief Ground" }],
+      "routes": {
+        "risky": [[11.5173, 76.1360], [11.5280, 76.1420], [11.5400, 76.1430], [11.5543, 76.1415]],
+        "safe": [[11.5173, 76.1360], [11.5170, 76.1200], [11.5400, 76.1180], [11.5543, 76.1300], [11.5543, 76.1415]],
+        "safe_km": 7.8, "safe_min": 20,
+        "risky_km": 4.6, "risky_min": 11,
+        "risky_note": "Crosses Landslide zone Z1 and Flood zone Z3"
+      }
+    },
+    {
+      "id": "h2",
+      "name": "Chooralmala",
+      "lat": 11.5280,
+      "lng": 76.1420,
+      "population": 1200,
+      "hazard_type": "Landslide + Flood",
+      "hazard_note": "Slope zone Z1 and river zone Z3",
+      "priority": { "tier": "Red", "priority_score": 90 },
+      "recommended_sites": [{ "site_name": "Kalpetta Outskirts" }],
+      "routes": {
+        "risky": [[11.5280, 76.1420], [11.5300, 76.1300], [11.5400, 76.1200], [11.5700, 76.0950], [11.6100, 76.0800]],
+        "safe": [[11.5280, 76.1420], [11.5450, 76.1550], [11.5700, 76.1300], [11.5900, 76.1000], [11.6100, 76.0800]],
+        "safe_km": 13.2, "safe_min": 30,
+        "risky_km": 9.4, "risky_min": 19,
+        "risky_note": "Runs through Landslide zone Z1"
+      }
+    },
+    {
+      "id": "h3",
+      "name": "Puthumala",
+      "lat": 11.5010,
+      "lng": 76.1490,
+      "population": 600,
+      "hazard_type": "Landslide",
+      "hazard_note": "Inside Hillside zone Z2",
+      "priority": { "tier": "Green", "priority_score": 55 },
+      "recommended_sites": [{ "site_name": "Meppadi Relief Ground" }],
+      "routes": {
+        "risky": [[11.5010, 76.1490], [11.5150, 76.1450], [11.5350, 76.1420], [11.5543, 76.1415]],
+        "safe": [[11.5010, 76.1490], [11.5050, 76.1650], [11.5350, 76.1650], [11.5543, 76.1500], [11.5543, 76.1415]],
+        "safe_km": 9.1, "safe_min": 24,
+        "risky_km": 6.2, "risky_min": 15,
+        "risky_note": "Passes through Landslide zone Z1"
+      }
+    }
+  ],
+  "candidate_sites": [
+    {
+      "id": "s1",
+      "name": "Meppadi Relief Ground",
+      "lat": 11.5543,
+      "lng": 76.1415,
+      "area_sqm": 60000,
+      "suitability": { "final_score": 88 }
+    },
+    {
+      "id": "s2",
+      "name": "Kalpetta Outskirts",
+      "lat": 11.6100,
+      "lng": 76.0800,
+      "area_sqm": 45000,
+      "suitability": { "final_score": 76 }
+    }
+  ]
+}

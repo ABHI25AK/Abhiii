@@ -1,0 +1,129 @@
+{
+  "district": "Wayanad",
+  "habitations": [
+    {
+      "id": "h1",
+      "name": "Mundakkai",
+      "lat": 11.5173,
+      "lng": 76.1360,
+      "population": 850,
+      "hazard_history": 3,
+      "current_hazard_exposure": 85
+    },
+    {
+      "id": "h2",
+      "name": "Chooralmala",
+      "lat": 11.5280,
+      "lng": 76.1420,
+      "population": 1200,
+      "hazard_history": 2,
+      "current_hazard_exposure": 90
+    },
+    {
+      "id": "h3",
+      "name": "Meppadi (Safe Zone)",
+      "lat": 11.5543,
+      "lng": 76.1415,
+      "population": 3000,
+      "hazard_history": 0,
+      "current_hazard_exposure": 20
+    },
+    {
+      "id": "h4",
+      "name": "Puthumala",
+      "lat": 11.5030,
+      "lng": 76.1120,
+      "population": 400,
+      "hazard_history": 1,
+      "current_hazard_exposure": 75
+    },
+    {
+      "id": "h5",
+      "name": "Kalpetta (Outskirts)",
+      "lat": 11.6050,
+      "lng": 76.0830,
+      "population": 4500,
+      "hazard_history": 0,
+      "current_hazard_exposure": 10
+    }
+  ],
+  "candidate_sites": [
+    {
+      "id": "s1",
+      "name": "Kalpetta Plains A",
+      "lat": 11.6200,
+      "lng": 76.0900,
+      "land_availability": 80,
+      "water_access": 90,
+      "distance_to_services": 10,
+      "ecological_risk_flag": false
+    },
+    {
+      "id": "s2",
+      "name": "Meppadi Valley B",
+      "lat": 11.5700,
+      "lng": 76.1600,
+      "land_availability": 60,
+      "water_access": 70,
+      "distance_to_services": 20,
+      "ecological_risk_flag": false
+    },
+    {
+      "id": "s3",
+      "name": "Vythiri Forest Edge",
+      "lat": 11.5400,
+      "lng": 76.0300,
+      "land_availability": 90,
+      "water_access": 80,
+      "distance_to_services": 40,
+      "ecological_risk_flag": true
+    },
+    {
+      "id": "s4",
+      "name": "Ambalavayal Plot",
+      "lat": 11.6250,
+      "lng": 76.2100,
+      "land_availability": 75,
+      "water_access": 60,
+      "distance_to_services": 15,
+      "ecological_risk_flag": false
+    }
+  ],
+  "red_zones": [
+    {
+      "id": "z1",
+      "name": "Mundakkai Landslide Belt",
+      "hazard_type": "Landslide",
+      "severity": "High",
+      "polygon": [
+        [11.5100, 76.1300],
+        [11.5150, 76.1450],
+        [11.5300, 76.1450],
+        [11.5250, 76.1200]
+      ]
+    },
+    {
+      "id": "z2",
+      "name": "Puthumala Erosion Zone",
+      "hazard_type": "Erosion/Landslide",
+      "severity": "High",
+      "polygon": [
+        [11.4900, 76.1000],
+        [11.5100, 76.1200],
+        [11.5050, 76.1000]
+      ]
+    },
+    {
+      "id": "z3",
+      "name": "Chooralmala Flood Plain",
+      "hazard_type": "Flood/Debris",
+      "severity": "Medium",
+      "polygon": [
+        [11.5200, 76.1350],
+        [11.5400, 76.1550],
+        [11.5300, 76.1600],
+        [11.5200, 76.1400]
+      ]
+    }
+  ]
+}
