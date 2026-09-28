@@ -1,9 +1,9 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import data from '../data/hazardData.json';
+import { relocationSites as initialSites } from '../data/relocationSites';
 
 const DEFAULTS = { rainfall: 50, slope: 50, soil: 50, flood: 50 };
 
-// f = sensitivity to rainfall, slope, soil, flood (0 to 1)
 const ZONES = [
   { id: 'wayanad', name: 'Wayanad', lat: 11.6, lng: 76.1, f: [0.9, 1.0, 0.9, 0.6] },
   { id: 'idukki', name: 'Idukki', lat: 9.85, lng: 76.95, f: [0.95, 1.0, 0.85, 0.5] },
@@ -30,33 +30,23 @@ function load(key, fallback) {
 function save(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
-  } catch (e) {
-    // ignore
-  }
+  } catch (e) { }
 }
 
-// state that is saved in the browser and synced between tabs
 function usePersisted(key, initial) {
   const [value, setValue] = useState(() => load(key, initial));
-
   useEffect(() => {
     save(key, value);
   }, [key, value]);
-
   useEffect(() => {
     const onStorage = (e) => {
       if (e.key === key && e.newValue) {
-        try {
-          setValue(JSON.parse(e.newValue));
-        } catch (err) {
-          // ignore
-        }
+        try { setValue(JSON.parse(e.newValue)); } catch (err) { }
       }
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, [key]);
-
   return [value, setValue];
 }
 
@@ -64,56 +54,57 @@ const HazardContext = createContext(null);
 
 export function HazardProvider({ children }) {
   const [sliders, setSliders] = usePersisted('dss_sliders', DEFAULTS);
+  
+  // Legacy states (kept to prevent breaking existing dashboard code)
   const [plans, setPlans] = usePersisted('dss_plans', {});
   const [validations, setValidations] = usePersisted('dss_validations', {});
+  
+  // NEW WORKFLOW STATES
+  const [relocationPlans, setRelocationPlans] = usePersisted('dss_relocation_plans', []);
+  const [dynamicSites, setDynamicSites] = usePersisted('dss_dynamic_sites', initialSites);
 
-  const setSlider = (key, value) =>
-    setSliders((p) => ({ ...p, [key]: value }));
+  const setSlider = (key, value) => setSliders((p) => ({ ...p, [key]: value }));
   const resetSliders = () => setSliders(DEFAULTS);
+  
+  // Legacy functions
+  const setPlan = (villageId, plan) => setPlans((p) => ({ ...p, [villageId]: plan }));
+  const approvePlan = (villageId) => setPlans((p) => ({ ...p, [villageId]: { ...p[villageId], approved: true } }));
+  const submitValidation = (siteId, result) => setValidations((p) => ({ ...p, [siteId]: result }));
 
-  const setPlan = (villageId, plan) =>
-    setPlans((p) => ({ ...p, [villageId]: plan }));
-  const approvePlan = (villageId) =>
-    setPlans((p) => ({ ...p, [villageId]: { ...p[villageId], approved: true } }));
-
-  const submitValidation = (siteId, result) =>
-    setValidations((p) => ({ ...p, [siteId]: result }));
+  // NEW WORKFLOW FUNCTIONS
+  const addRelocationPlan = (plan) => setRelocationPlans(p => [...p, plan]);
+  const updateRelocationPlan = (id, updates) => setRelocationPlans(p => p.map(x => x.id === id ? { ...x, ...updates, updatedAt: new Date().toISOString() } : x));
+  const updateSiteOccupancy = (siteId, additionalOccupancy) => {
+    setDynamicSites(s => s.map(x => x.id === siteId ? { ...x, occupiedCapacity: x.occupiedCapacity + additionalOccupancy } : x));
+  };
 
   const resetAll = () => {
     setSliders(DEFAULTS);
     setPlans({});
     setValidations({});
+    setRelocationPlans([]);
+    setDynamicSites(initialSites);
   };
 
-  const severity =
-    (sliders.rainfall + sliders.slope + sliders.soil + sliders.flood) / 400;
+  const severity = (sliders.rainfall + sliders.slope + sliders.soil + sliders.flood) / 400;
 
-  // Analyst zones (state level)
-  const zones = useMemo(
-    () =>
-      ZONES.map((z) => {
-        const raw =
-          (z.f[0] * sliders.rainfall +
-            z.f[1] * sliders.slope +
-            z.f[2] * sliders.soil +
-            z.f[3] * sliders.flood) / 2.5;
-        const score = Math.min(100, Math.round(raw));
-        return { ...z, score, active: score >= ZONE_THRESHOLD, type: z.f[1] >= z.f[3] ? 'Landslide' : 'Flood' };
-      }),
-    [sliders]
+  const zones = useMemo(() =>
+    ZONES.map((z) => {
+      const raw = (z.f[0] * sliders.rainfall + z.f[1] * sliders.slope + z.f[2] * sliders.soil + z.f[3] * sliders.flood) / 2.5;
+      const score = Math.min(100, Math.round(raw));
+      return { ...z, score, active: score >= ZONE_THRESHOLD, type: z.f[1] >= z.f[3] ? 'Landslide' : 'Flood' };
+    }), [sliders]
   );
+  
   const activeCount = zones.filter((z) => z.active).length;
 
-  // Collector villages (live score and tier react to sliders)
   const villages = useMemo(() => {
     const factor = 0.6 + severity * 0.8;
-    return data.habitations
-      .map((h) => {
-        const liveScore = Math.min(100, Math.round(h.priority.priority_score * factor));
-        const tier = liveScore >= 75 ? 'Red' : liveScore >= 60 ? 'Yellow' : 'Green';
-        return { ...h, liveScore, tier };
-      })
-      .sort((a, b) => b.liveScore - a.liveScore);
+    return data.habitations.map((h) => {
+      const liveScore = Math.min(100, Math.round(h.priority.priority_score * factor));
+      const tier = liveScore >= 75 ? 'Red' : liveScore >= 60 ? 'Yellow' : 'Green';
+      return { ...h, liveScore, tier };
+    }).sort((a, b) => b.liveScore - a.liveScore);
   }, [severity]);
 
   const approvedCount = Object.values(plans).filter((p) => p.approved).length;
@@ -127,6 +118,10 @@ export function HazardProvider({ children }) {
         plans, setPlan, approvePlan,
         validations, submitValidation,
         approvedCount, validationCount,
+        
+        // NEW EXPORTS
+        relocationPlans, addRelocationPlan, updateRelocationPlan,
+        dynamicSites, updateSiteOccupancy
       }}
     >
       {children}
