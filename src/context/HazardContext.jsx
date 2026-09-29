@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import data from '../data/hazardData.json';
 import { relocationSites as initialSites } from '../data/relocationSites';
+import { habitations as newHabitations } from '../data/habitations';
+import { calculateHabitationRisk, DEFAULT_WEIGHTS } from '../utils/riskScoring';
 
 const DEFAULTS = { rainfall: 50, slope: 50, soil: 50, flood: 50 };
 
@@ -55,23 +57,44 @@ const HazardContext = createContext(null);
 export function HazardProvider({ children }) {
   const [sliders, setSliders] = usePersisted('dss_sliders', DEFAULTS);
   
-  // Legacy states (kept to prevent breaking existing dashboard code)
+  // Legacy states
   const [plans, setPlans] = usePersisted('dss_plans', {});
   const [validations, setValidations] = usePersisted('dss_validations', {});
   
   // NEW WORKFLOW STATES
   const [relocationPlans, setRelocationPlans] = usePersisted('dss_relocation_plans', []);
   const [dynamicSites, setDynamicSites] = usePersisted('dss_dynamic_sites', initialSites);
+  
+  // Bug 2 sync: Read weights/scenario for Collector list consistency
+  const [weights, setWeights] = useState(() => load('riskModelWeights', DEFAULT_WEIGHTS));
+  const [rainfallScenario, setRainfallScenario] = useState(() => {
+    try { return Number(localStorage.getItem('rainfallScenario')) || 0; } catch { return 0; }
+  });
+
+  useEffect(() => {
+    const handleWeights = () => setWeights(load('riskModelWeights', DEFAULT_WEIGHTS));
+    const handleScenario = () => {
+      try { setRainfallScenario(Number(localStorage.getItem('rainfallScenario')) || 0); } catch { setRainfallScenario(0); }
+    };
+    window.addEventListener('weightsChanged', handleWeights);
+    window.addEventListener('scenarioChanged', handleScenario);
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'riskModelWeights') handleWeights();
+      if (e.key === 'rainfallScenario') handleScenario();
+    });
+    return () => {
+      window.removeEventListener('weightsChanged', handleWeights);
+      window.removeEventListener('scenarioChanged', handleScenario);
+    };
+  }, []);
 
   const setSlider = (key, value) => setSliders((p) => ({ ...p, [key]: value }));
   const resetSliders = () => setSliders(DEFAULTS);
   
-  // Legacy functions
   const setPlan = (villageId, plan) => setPlans((p) => ({ ...p, [villageId]: plan }));
   const approvePlan = (villageId) => setPlans((p) => ({ ...p, [villageId]: { ...p[villageId], approved: true } }));
   const submitValidation = (siteId, result) => setValidations((p) => ({ ...p, [siteId]: result }));
 
-  // NEW WORKFLOW FUNCTIONS
   const addRelocationPlan = (plan) => setRelocationPlans(p => [...p, plan]);
   const updateRelocationPlan = (id, updates) => setRelocationPlans(p => p.map(x => x.id === id ? { ...x, ...updates, updatedAt: new Date().toISOString() } : x));
   const updateSiteOccupancy = (siteId, additionalOccupancy) => {
@@ -99,13 +122,39 @@ export function HazardProvider({ children }) {
   const activeCount = zones.filter((z) => z.active).length;
 
   const villages = useMemo(() => {
-    const factor = 0.6 + severity * 0.8;
-    return data.habitations.map((h) => {
-      const liveScore = Math.min(100, Math.round(h.priority.priority_score * factor));
-      const tier = liveScore >= 75 ? 'Red' : liveScore >= 60 ? 'Yellow' : 'Green';
-      return { ...h, liveScore, tier };
+    // Bug 2 fix: map newHabitations using riskScoring
+    return newHabitations.map((h) => {
+      const hCopy = { ...h };
+      if (rainfallScenario > 0) {
+        hCopy.rainfallScore = Math.min(100, hCopy.rainfallScore * (1 + rainfallScenario / 100));
+      }
+      const scored = calculateHabitationRisk(hCopy, weights);
+      
+      // Attempt lookup in old data by name for routes and legacy fields
+      const legacyMatch = data.habitations.find(old => old.name === h.name);
+      
+      // Default dummy routes if not found
+      const defaultRoutes = {
+        safe: [[h.latitude, h.longitude], [h.latitude + 0.05, h.longitude + 0.05]],
+        risky: [[h.latitude, h.longitude], [h.latitude - 0.05, h.longitude - 0.05]],
+        safe_km: 5.0, safe_min: 15, risky_km: 3.0, risky_min: 8, risky_note: "Default risky route"
+      };
+
+      return {
+        id: h.id,
+        name: h.name,
+        lat: h.latitude,
+        lng: h.longitude,
+        population: h.population,
+        tier: scored.redZoneCategory === 'Orange' ? 'Yellow' : scored.redZoneCategory,
+        liveScore: Math.round(scored.finalRiskScore),
+        hazard_type: h.landslideScore >= h.floodScore ? 'Landslide' : 'Flood',
+        hazard_note: legacyMatch ? legacyMatch.hazard_note : scored.explanation,
+        routes: legacyMatch ? legacyMatch.routes : defaultRoutes,
+        recommended_sites: legacyMatch ? legacyMatch.recommended_sites : []
+      };
     }).sort((a, b) => b.liveScore - a.liveScore);
-  }, [severity]);
+  }, [weights, rainfallScenario]);
 
   const approvedCount = Object.values(plans).filter((p) => p.approved).length;
   const validationCount = Object.keys(validations).length;

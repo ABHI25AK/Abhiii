@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { habitations } from '../data/habitations';
-import { calculateHabitationRisk } from '../utils/riskScoring';
+import { calculateHabitationRisk, DEFAULT_WEIGHTS } from '../utils/riskScoring';
 import { calculateSiteSuitabilityAndCapacity } from '../utils/capacityCalculator';
 import { MapContainer, TileLayer, CircleMarker, Tooltip, Polyline } from 'react-leaflet';
-import { ShieldAlert, Users, Home, AlertTriangle, ArrowRight, CheckCircle2, XCircle } from 'lucide-react';
+import { ShieldAlert, Users, Home, AlertTriangle, ArrowRight, CheckCircle2, XCircle, Download } from 'lucide-react';
 import { useHazard } from '../context/HazardContext';
+import AuditTimeline from '../components/AuditTimeline';
 import 'leaflet/dist/leaflet.css';
 
 export default function RelocationPlanner() {
@@ -16,11 +17,57 @@ export default function RelocationPlanner() {
   const [notes, setNotes] = useState('');
   const [category, setCategory] = useState('');
 
-  // Process data
-  const scoredHabitations = useMemo(() => habitations.map(h => calculateHabitationRisk(h)).sort((a,b) => b.finalRiskScore - a.finalRiskScore), []);
+  const [weights, setWeights] = useState(() => {
+    try {
+      const w = localStorage.getItem('riskModelWeights');
+      return w ? JSON.parse(w) : DEFAULT_WEIGHTS;
+    } catch { return DEFAULT_WEIGHTS; }
+  });
+  
+  const [rainfallScenario, setRainfallScenario] = useState(() => {
+    try {
+      return Number(localStorage.getItem('rainfallScenario')) || 0;
+    } catch { return 0; }
+  });
+
+  useEffect(() => {
+    const handleWeights = () => {
+      try {
+        const w = localStorage.getItem('riskModelWeights');
+        if (w) setWeights(JSON.parse(w));
+      } catch {}
+    };
+    const handleScenario = () => {
+      try {
+        setRainfallScenario(Number(localStorage.getItem('rainfallScenario')) || 0);
+      } catch {}
+    };
+    
+    window.addEventListener('weightsChanged', handleWeights);
+    window.addEventListener('scenarioChanged', handleScenario);
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'riskModelWeights') handleWeights();
+      if (e.key === 'rainfallScenario') handleScenario();
+    });
+    
+    return () => {
+      window.removeEventListener('weightsChanged', handleWeights);
+      window.removeEventListener('scenarioChanged', handleScenario);
+    };
+  }, []);
+
+  const scoredHabitations = useMemo(() => {
+    return habitations.map(h => {
+      const hCopy = { ...h };
+      if (rainfallScenario > 0) {
+        hCopy.rainfallScore = Math.min(100, hCopy.rainfallScore * (1 + rainfallScenario / 100));
+      }
+      return calculateHabitationRisk(hCopy, weights);
+    }).sort((a,b) => b.finalRiskScore - a.finalRiskScore);
+  }, [weights, rainfallScenario]);
+  
   const processedSites = useMemo(() => dynamicSites.map(s => calculateSiteSuitabilityAndCapacity(s)).sort((a,b) => b.suitabilityScore - a.suitabilityScore), [dynamicSites]);
 
-  // Summary Metrics
   const highRiskHabs = scoredHabitations.filter(h => h.redZoneCategory === 'Red' || h.redZoneCategory === 'Orange');
   const peopleImmediate = scoredHabitations.filter(h => h.relocationCategory === 'Immediate Relocation').reduce((acc, h) => acc + h.population, 0);
   const totalSafeCapacity = processedSites.reduce((acc, s) => acc + s.finalCapacity, 0);
@@ -47,7 +94,6 @@ export default function RelocationPlanner() {
   const submitPlan = () => {
     if (!selectedHab || !selectedSite) return;
     
-    // Check if we are updating a revision
     const existingPlan = relocationPlans.find(p => p.habitationId === selectedHab.id && p.status === 'Revision Required');
     
     if (existingPlan) {
@@ -94,14 +140,49 @@ export default function RelocationPlanner() {
     setCategory(hab.relocationCategory);
     setPlanModalOpen(true);
   };
+  
+  const exportDistrictBrief = () => {
+    const headers = ['Rank', 'Habitation Name', 'Ward', 'Population', 'Risk Score', 'Zone Category', 'Relocation Category', 'Plan Status'];
+    const rows = scoredHabitations.map((h, i) => {
+      const plan = relocationPlans.find(p => p.habitationId === h.id);
+      return [
+        i + 1,
+        `"${h.name}"`,
+        `"${h.ward}"`,
+        h.population,
+        Math.round(h.finalRiskScore),
+        `"${h.redZoneCategory}"`,
+        `"${h.relocationCategory}"`,
+        plan ? `"${plan.status}"` : '"Unplanned"'
+      ].join(',');
+    });
+    
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.setAttribute('download', 'District_Relocation_Brief.csv');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
   const revisions = relocationPlans.filter(p => p.status === 'Revision Required');
+  
+  const activePlan = selectedHab ? relocationPlans.find(p => p.habitationId === selectedHab.id) : null;
 
   return (
     <div className="flex flex-col h-full w-full bg-slate-900 text-slate-200 overflow-y-auto">
-      <div className="p-4 bg-slate-950 border-b border-slate-800">
-        <h1 className="text-xl font-bold text-white mb-1">Proactive Relocation Planner</h1>
-        <p className="text-xs text-slate-400">Identify risk, validate vulnerability, match safe sites, verify carrying capacity, and approve relocation action.</p>
+      <div className="p-4 bg-slate-950 border-b border-slate-800 flex justify-between items-start">
+        <div>
+          <h1 className="text-xl font-bold text-white mb-1">Proactive Relocation Planner</h1>
+          <p className="text-xs text-slate-400">Identify risk, validate vulnerability, match safe sites, verify carrying capacity, and approve relocation action.</p>
+        </div>
+        <button onClick={exportDistrictBrief} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-4 py-2 rounded font-semibold text-sm transition-colors">
+          <Download size={16} />
+          Export District Brief
+        </button>
       </div>
 
       <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -196,11 +277,18 @@ export default function RelocationPlanner() {
                 ))}
               </div>
 
-              {selectedSite && (
+              {selectedSite && !activePlan && (
                 <button onClick={() => openPlanModal(selectedHab)} className="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-semibold">
                   Create Relocation Plan
                 </button>
               )}
+              {selectedSite && activePlan && activePlan.status === 'Revision Required' && (
+                <button onClick={() => openPlanModal(selectedHab)} className="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-semibold">
+                  Update Relocation Plan
+                </button>
+              )}
+              
+              {activePlan && <AuditTimeline plan={activePlan} />}
             </div>
           ) : (
             <div className="flex items-center justify-center h-full text-slate-500 text-sm">

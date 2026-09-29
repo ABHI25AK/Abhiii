@@ -5,6 +5,9 @@ import CollectorDashboard from './dashboards/CollectorDashboard';
 import AnalystDashboard from './dashboards/AnalystDashboard';
 import FieldOfficerDashboard from './dashboards/FieldOfficerDashboard';
 import RelocationPlanner from './pages/RelocationPlanner';
+import MapDashboard from './components/MapDashboard';
+import PriorityDashboard from './components/PriorityDashboard';
+import { getDashboardData } from './services/scoring';
 import { ROLES } from './constants';
 
 const SUBTITLES = {
@@ -22,15 +25,32 @@ function getSavedRole() {
   }
 }
 
+function ExplainableView() {
+  const [tab, setTab] = useState('map');
+  const data = getDashboardData(1.0);
+  
+  return (
+    <div className="flex flex-col h-full w-full bg-slate-900 text-slate-100">
+      <div className="flex bg-slate-950 p-2 gap-2 border-b border-slate-800">
+        <button onClick={() => setTab('map')} className={`px-4 py-2 text-sm font-bold rounded ${tab === 'map' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>Map View</button>
+        <button onClick={() => setTab('priority')} className={`px-4 py-2 text-sm font-bold rounded ${tab === 'priority' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>Priority Table</button>
+      </div>
+      <div className="flex-1 overflow-hidden">
+        {tab === 'map' ? <MapDashboard data={data} rainfallMultiplier={1.0} setRainfallMultiplier={()=>{}} /> : <PriorityDashboard data={data} />}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [role, setRole] = useState(getSavedRole);
-  const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' or 'planner'
+  const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard', 'planner', 'explainable'
 
   useEffect(() => {
     try {
       localStorage.setItem('role', role);
       // Reset view when role changes to avoid confusion if a view is role-specific
-      if (role !== ROLES.COLLECTOR && currentView === 'planner') {
+      if (role !== ROLES.COLLECTOR && role !== ROLES.ANALYST && (currentView === 'planner' || currentView === 'explainable')) {
         setCurrentView('dashboard');
       }
     } catch (e) {
@@ -58,12 +78,20 @@ export default function App() {
             </button>
             
             {(role === ROLES.COLLECTOR || role === ROLES.ANALYST) && (
-              <button 
-                onClick={() => setCurrentView('planner')}
-                className={`w-full text-left px-3 py-2 rounded flex items-center gap-2 ${currentView === 'planner' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}
-              >
-                <span className="truncate text-sm font-medium">Relocation Planner</span>
-              </button>
+              <>
+                <button 
+                  onClick={() => setCurrentView('planner')}
+                  className={`w-full text-left px-3 py-2 rounded flex items-center gap-2 ${currentView === 'planner' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}
+                >
+                  <span className="truncate text-sm font-medium">Relocation Planner</span>
+                </button>
+                <button 
+                  onClick={() => setCurrentView('explainable')}
+                  className={`w-full text-left px-3 py-2 rounded flex items-center gap-2 ${currentView === 'explainable' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}
+                >
+                  <span className="truncate text-sm font-medium">Explainable Risk View</span>
+                </button>
+              </>
             )}
           </nav>
         </aside>
@@ -88,6 +116,8 @@ export default function App() {
           <main className="flex-1 min-h-0 relative overflow-hidden">
             {currentView === 'planner' ? (
               <RelocationPlanner />
+            ) : currentView === 'explainable' ? (
+              <ExplainableView />
             ) : (
               <>
                 {role === ROLES.COLLECTOR && <CollectorDashboard />}
